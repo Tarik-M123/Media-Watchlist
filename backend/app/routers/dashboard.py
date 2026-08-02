@@ -24,8 +24,8 @@ def get_dashboard(
     counts = {s: 0 for s in STATUSES}
 
     for item in all_items:
-        grouped[item.status].append(item)
-        counts[item.status] += 1
+        grouped.setdefault(item.status, []).append(item)
+        counts[item.status] = counts.get(item.status, 0) + 1
 
     stats = schemas.DashboardStats(
         planning_to_watch=counts["planning_to_watch"],

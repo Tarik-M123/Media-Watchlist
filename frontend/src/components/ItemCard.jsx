@@ -8,6 +8,7 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
   // send status + rating together.
   const [awaitingRating, setAwaitingRating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pendingStatusChange, setPendingStatusChange] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -24,13 +25,24 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
   }
 
   function changeStatus(next) {
+    setAwaitingRating(false)
     if (next === item.status) return
     if (next === 'finished' && item.rating == null) {
       setAwaitingRating(true)
       return
     }
-    setAwaitingRating(false)
+    if (item.status === 'finished' && item.rating != null && next !== 'finished') {
+      setPendingStatusChange(next)
+      return
+    }
     run(() => onUpdate(item.id, { status: next }))
+  }
+
+  function confirmStatusChange() {
+    if (pendingStatusChange) {
+      setPendingStatusChange(null)
+      run(() => onUpdate(item.id, { status: pendingStatusChange }))
+    }
   }
 
   function rate(rating) {
@@ -67,10 +79,16 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
         </div>
       )}
 
+      {pendingStatusChange && (
+        <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-200">
+          This will clear your {item.rating}-star rating. Continue?
+        </div>
+      )}
+
       <div className="mt-3 flex items-center gap-2 border-t border-slate-800 pt-3">
         <select
           value={awaitingRating ? 'finished' : item.status}
-          disabled={busy}
+          disabled={busy || pendingStatusChange}
           onChange={(e) => changeStatus(e.target.value)}
           className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50"
         >
@@ -81,7 +99,24 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
           ))}
         </select>
 
-        {confirmDelete ? (
+        {pendingStatusChange ? (
+          <>
+            <button
+              onClick={confirmStatusChange}
+              disabled={busy}
+              className="rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-amber-500 disabled:opacity-50"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setPendingStatusChange(null)}
+              disabled={busy}
+              className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+          </>
+        ) : confirmDelete ? (
           <>
             <button
               onClick={() => run(() => onDelete(item.id))}

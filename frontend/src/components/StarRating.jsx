@@ -12,7 +12,7 @@ export default function StarRating({ value, onRate, disabled = false, size = 'sm
             disabled={disabled}
             onClick={() => onRate(star)}
             aria-label={`Rate ${star} out of 5`}
-            className="rounded transition disabled:cursor-not-allowed enabled:hover:scale-110"
+            className="rounded p-2 transition disabled:cursor-not-allowed enabled:hover:scale-110"
           >
             <svg
               viewBox="0 0 20 20"

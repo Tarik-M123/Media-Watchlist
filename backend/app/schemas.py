@@ -41,7 +41,7 @@ class WatchlistItemCreate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def rating_required_when_finished(self):
+    def validate_rating(self):
         if self.status == "finished" and self.rating is None:
             raise ValueError("Rating is required when status is 'finished'")
         if self.status != "finished" and self.rating is not None:

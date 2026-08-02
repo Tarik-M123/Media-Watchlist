@@ -19,6 +19,7 @@ class WatchlistItem(Base):
 
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 5", name="rating_range"),
+        CheckConstraint("status IN ('planning_to_watch','watching','finished','dropped')", name="status_valid"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
