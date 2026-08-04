@@ -1,0 +1,8 @@
+# Dev-only dependencies for the watchlist-engine MCP server.
+# Deliberately kept OUT of backend/requirements.txt: fastmcp needs a newer
+# pydantic than the API's pinned 2.9.2, so this package gets its own venv.
+fastmcp>=2.10
+httpx>=0.27
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+python-dotenv>=1.0.1

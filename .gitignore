@@ -18,7 +18,8 @@ dist-ssr/
 *.local
 
 # Editors / tooling
-.claude/settings.local.json*
+# Local Claude Code config — contains machine-specific paths and permissions.
+.claude/
 .vscode/
 .idea/
 *.swp
