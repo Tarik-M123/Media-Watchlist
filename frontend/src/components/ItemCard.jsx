@@ -53,10 +53,10 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
   const showStars = item.status === 'finished' || awaitingRating
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-700">
+    <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none dark:hover:border-slate-700">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate font-medium text-slate-100" title={item.title}>
+          <h3 className="truncate font-medium text-slate-900 dark:text-slate-100" title={item.title}>
             {item.title}
           </h3>
           <p className="mt-0.5 truncate text-xs text-slate-500">{item.platform}</p>
@@ -72,7 +72,7 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
         <div className="mt-3 flex items-center gap-2">
           <StarRating value={item.rating} onRate={rate} disabled={busy} />
           {awaitingRating && (
-            <span className="text-[11px] text-amber-300">
+            <span className="text-[11px] text-amber-700 dark:text-amber-300">
               Pick a rating to finish
             </span>
           )}
@@ -80,17 +80,17 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
       )}
 
       {pendingStatusChange && (
-        <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-200">
+        <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
           This will clear your {item.rating}-star rating. Continue?
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2 border-t border-slate-800 pt-3">
+      <div className="mt-3 flex items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
         <select
           value={awaitingRating ? 'finished' : item.status}
           disabled={busy || pendingStatusChange}
           onChange={(e) => changeStatus(e.target.value)}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50"
+          className="flex-1 rounded-lg border border-slate-400 bg-white px-2 py-1.5 text-xs outline-none focus:border-indigo-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950"
         >
           {STATUS_ORDER.map((s) => (
             <option key={s} value={s}>
@@ -111,7 +111,7 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
             <button
               onClick={() => setPendingStatusChange(null)}
               disabled={busy}
-              className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-400 px-2.5 py-1.5 text-xs text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -127,7 +127,7 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-400 px-2.5 py-1.5 text-xs text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
@@ -137,14 +137,14 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
             onClick={() => setConfirmDelete(true)}
             disabled={busy}
             aria-label={`Delete ${item.title}`}
-            className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-rose-700 hover:text-rose-300 disabled:opacity-50"
+            className="rounded-lg border border-slate-400 px-2.5 py-1.5 text-xs text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-rose-700 dark:hover:text-rose-300"
           >
             Delete
           </button>
         )}
       </div>
 
-      {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+      {error && <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">{error}</p>}
     </div>
   )
 }

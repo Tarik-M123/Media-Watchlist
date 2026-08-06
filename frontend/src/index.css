@@ -1,14 +1,31 @@
 @import "tailwindcss";
 
+/* Tailwind v4 ties `dark:` to the OS setting by default. This repoints it at a
+   class on <html> so ThemeToggle can drive the theme regardless of the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Keeps native UI — scrollbars, form controls, autofill — in step with the
+   theme. Tailwind utilities don't reach those. */
 :root {
+  color-scheme: light;
+}
+
+:root.dark {
   color-scheme: dark;
 }
 
 body {
   margin: 0;
   min-height: 100svh;
-  background-color: var(--color-slate-950);
-  color: var(--color-slate-100);
+  /* Tinted rather than white so the white cards read as raised surfaces —
+     against slate-50 the two were barely a percent apart in luminance. */
+  background-color: var(--color-slate-100);
+  color: var(--color-slate-900);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root.dark body {
+  background-color: var(--color-slate-950);
+  color: var(--color-slate-100);
 }

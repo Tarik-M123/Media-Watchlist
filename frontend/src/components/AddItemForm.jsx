@@ -46,31 +46,31 @@ export default function AddItemForm({ onCreate }) {
   return (
     <form
       onSubmit={submit}
-      className="rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+      className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-400">Title</label>
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Title</label>
           <input
             value={form.title}
             onChange={(e) => update({ title: e.target.value })}
             placeholder="Severance"
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
           />
         </div>
 
         <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-400">Platform</label>
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Platform</label>
           <input
             value={form.platform}
             onChange={(e) => update({ platform: e.target.value })}
             placeholder="Apple TV+"
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
           />
         </div>
 
         <div className="sm:w-48">
-          <label className="block text-xs font-medium text-slate-400">Status</label>
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Status</label>
           <select
             value={form.status}
             onChange={(e) =>
@@ -79,7 +79,7 @@ export default function AddItemForm({ onCreate }) {
                 rating: e.target.value === 'finished' ? form.rating : null,
               })
             }
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
           >
             {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
@@ -99,8 +99,8 @@ export default function AddItemForm({ onCreate }) {
       </div>
 
       {form.status === 'finished' && (
-        <div className="mt-3 flex items-center gap-3 border-t border-slate-800 pt-3">
-          <span className="text-xs font-medium text-slate-400">
+        <div className="mt-3 flex items-center gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
             Rating <span className="text-rose-400">*</span>
           </span>
           <StarRating value={form.rating} onRate={(rating) => update({ rating })} />
@@ -108,7 +108,7 @@ export default function AddItemForm({ onCreate }) {
       )}
 
       {error && (
-        <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-rose-500/30">
+        <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-500/30 dark:text-rose-300">
           {error}
         </p>
       )}

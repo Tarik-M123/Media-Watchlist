@@ -16,7 +16,7 @@ export default function StarRating({ value, onRate, disabled = false, size = 'sm
           >
             <svg
               viewBox="0 0 20 20"
-              className={`${dimension} ${filled ? 'text-amber-400' : 'text-slate-700'}`}
+              className={`${dimension} ${filled ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-600'}`}
               fill="currentColor"
             >
               <path d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L1.5 7.7l5.9-.9L10 1.5z" />

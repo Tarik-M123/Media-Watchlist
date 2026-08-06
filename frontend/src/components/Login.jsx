@@ -28,10 +28,10 @@ export default function Login({ onAuth }) {
     <div className="flex min-h-svh items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
             Media Watchlist
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Track what you're watching, across every platform.
           </p>
         </div>
@@ -41,9 +41,9 @@ export default function Login({ onAuth }) {
             e.preventDefault()
             submit('login')
           }}
-          className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl"
+          className="rounded-xl border border-slate-300 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900/60"
         >
-          <label htmlFor="email" className="block text-sm font-medium text-slate-300">
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
             Email address
           </label>
           <input
@@ -53,11 +53,11 @@ export default function Login({ onAuth }) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             autoComplete="email"
-            className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="mt-2 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder-slate-600"
           />
 
           {error && (
-            <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-rose-500/30">
+            <p className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-500/30 dark:text-rose-300">
               {error}
             </p>
           )}
@@ -74,7 +74,7 @@ export default function Login({ onAuth }) {
               type="button"
               disabled={busy}
               onClick={() => submit('register')}
-              className="flex-1 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-slate-400 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Register
             </button>
