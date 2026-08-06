@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { STATUS_META, STATUS_ORDER } from '../constants'
 import AddItemForm from './AddItemForm'
+import Clock from './Clock'
 import ItemCard from './ItemCard'
 import StatsBar from './StatsBar'
 import ThemeToggle from './ThemeToggle'
@@ -62,6 +63,7 @@ export default function Dashboard({ user, onLogout }) {
             narrow widths — justify-between resolves to flex-start once they
             are the only item on their line. */}
         <div className="ml-auto flex items-center gap-2">
+          <Clock />
           <ThemeToggle />
           <button
             onClick={onLogout}
