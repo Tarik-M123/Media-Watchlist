@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
 from app import models, schemas
 from app.dependencies import get_current_user
@@ -16,6 +16,9 @@ def get_dashboard(
 ):
     all_items = (
         db.query(models.WatchlistItem)
+        # Eager-load the catalogue and its posters: the response model resolves
+        # a poster per item, which would otherwise be 2N queries.
+        .options(selectinload(models.WatchlistItem.media).selectinload(models.Media.posters))
         .filter(models.WatchlistItem.user_id == current_user.id)
         .all()
     )

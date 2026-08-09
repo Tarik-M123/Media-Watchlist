@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.database import get_db
-from app import models, schemas
+from app import media_catalogue, models, schemas
 from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
+
+# Without this, WatchlistItemResponse's poster fields walk item.media.posters
+# per row and turn one query into 2N.
+WITH_POSTERS = selectinload(models.WatchlistItem.media).selectinload(models.Media.posters)
 
 
 @router.get("/", response_model=list[schemas.WatchlistItemResponse])
@@ -12,7 +16,12 @@ def get_watchlist(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    return db.query(models.WatchlistItem).filter(models.WatchlistItem.user_id == current_user.id).all()
+    return (
+        db.query(models.WatchlistItem)
+        .options(WITH_POSTERS)
+        .filter(models.WatchlistItem.user_id == current_user.id)
+        .all()
+    )
 
 
 @router.post("/", response_model=schemas.WatchlistItemResponse, status_code=status.HTTP_201_CREATED)
@@ -25,6 +34,11 @@ def create_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    # Best-effort: the item is already committed above, so a TMDB outage, a
+    # missing key, or an unrecognised title costs the poster, not the 201.
+    media_catalogue.enrich_item(db, item)
+
     return item
 
 

@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { STATUS_META, STATUS_ORDER } from '../constants'
+import MediaDetailModal from './MediaDetailModal'
+import MediaImage from './MediaImage'
 import StarRating from './StarRating'
 
 export default function ItemCard({ item, onUpdate, onDelete }) {
+  const [showDetail, setShowDetail] = useState(false)
   // Set when the user picks "finished" on an item that has no rating yet —
   // the API refuses that combination, so we collect the rating first and
   // send status + rating together.
@@ -53,19 +56,57 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
   const showStars = item.status === 'finished' || awaitingRating
 
   return (
-    <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none dark:hover:border-slate-700">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate font-medium text-slate-900 dark:text-slate-100" title={item.title}>
-            {item.title}
-          </h3>
-          <p className="mt-0.5 truncate text-xs text-slate-500">{item.platform}</p>
+    <div className="group rounded-xl border border-slate-300 bg-white p-4 shadow-sm transition hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:shadow-none dark:hover:border-slate-700">
+      {/* Only the poster + title region opens the detail view. The card as a
+          whole must not be clickable (or a <button>): it contains a select and
+          several buttons, and wrapping those would both nest interactive
+          elements and fire the modal on every status change. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-label={`View details for ${item.title}`}
+        onClick={() => setShowDetail(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setShowDetail(true)
+          }
+        }}
+        className="flex cursor-pointer items-start gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+      >
+        <MediaImage src={item.poster_url} title={item.title} size="card" />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              {/* Wraps to two lines rather than truncating: the poster and the
+                  status chip leave too little room for one line in the
+                  4-column grid, and "Peak…" is not a useful label. */}
+              <h3
+                className="line-clamp-2 font-medium text-slate-900 dark:text-slate-100"
+                title={item.title}
+              >
+                {item.title}
+              </h3>
+              <p className="mt-0.5 truncate text-xs text-slate-500">{item.platform}</p>
+            </div>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_META[item.status].chip}`}
+            >
+              {STATUS_META[item.status].label}
+            </span>
+          </div>
+
+          {/* Hover detail. Gated on `hover:hover` so touch devices — where
+              nothing can hover and the row would be permanently expanded —
+              rely on tapping through to the modal instead. */}
+          {(item.year || item.genres?.length) && (
+            <p className="mt-1 hidden truncate text-[11px] text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:hover)]:block">
+              {[item.year, item.genres?.slice(0, 2).join(', ')].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_META[item.status].chip}`}
-        >
-          {STATUS_META[item.status].label}
-        </span>
       </div>
 
       {showStars && (
@@ -145,6 +186,8 @@ export default function ItemCard({ item, onUpdate, onDelete }) {
       </div>
 
       {error && <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+
+      {showDetail && <MediaDetailModal item={item} onClose={() => setShowDetail(false)} />}
     </div>
   )
 }

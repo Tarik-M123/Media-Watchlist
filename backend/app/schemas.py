@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 
 StatusType = Literal["planning_to_watch", "watching", "finished", "dropped"]
@@ -71,6 +71,18 @@ class WatchlistItemUpdate(BaseModel):
         return self
 
 
+class PosterRef(BaseModel):
+    """Provenance for the poster actually being shown — attribution and debugging."""
+    url: str
+    source: str            # 'tmdb' | 'scraped' | 'manual'
+    size_label: str
+    width: Optional[int] = None
+    height: Optional[int] = None
+    fetched_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class WatchlistItemResponse(BaseModel):
     id: int
     user_id: int
@@ -78,10 +90,30 @@ class WatchlistItemResponse(BaseModel):
     platform: str
     status: str
     rating: Optional[int]
+
+    # TMDB metadata. These columns have existed since migration 001 but were
+    # never exposed, so the frontend could not render anything from them.
+    tmdb_id: Optional[int] = None
+    media_type: Optional[str] = None
+    year: Optional[int] = None
+    runtime_minutes: Optional[int] = None
+    genres: Optional[list[str]] = None
+    synopsis: Optional[str] = None
+
+    # Posters. Already resolved server-side (per-user override, then the
+    # catalogue winner), so the frontend just renders the URL or falls back to a
+    # placeholder when it is null.
+    media_id: Optional[int] = None
+    poster_url: Optional[str] = Field(default=None, validation_alias="display_poster_url")
+    poster_url_large: Optional[str] = Field(default=None, validation_alias="display_poster_url_large")
+    poster: Optional[PosterRef] = Field(default=None, validation_alias="primary_poster")
+
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    # populate_by_name lets the field names still work when a response is built
+    # from a dict rather than an ORM object.
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 # --- Dashboard ---
