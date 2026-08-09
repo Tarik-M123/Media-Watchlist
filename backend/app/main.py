@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routers import auth, watchlist, dashboard
+from app.routers import auth, watchlist, dashboard, media
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +18,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(watchlist.router)
 app.include_router(dashboard.router)
+app.include_router(media.router)
 
 
 @app.get("/")

@@ -28,7 +28,7 @@ function messageFrom(payload, status) {
   return `Request failed (${status})`
 }
 
-async function request(path, { method = 'GET', body, auth = true } = {}) {
+async function request(path, { method = 'GET', body, auth = true, signal } = {}) {
   const headers = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (auth) {
@@ -42,8 +42,12 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     })
-  } catch {
+  } catch (e) {
+    // An aborted request is a superseded keystroke, not a failure — rethrow it
+    // so callers can tell the two apart.
+    if (e.name === 'AbortError') throw e
     throw new Error('Cannot reach the API — is the backend running on port 8000?')
   }
 
@@ -68,4 +72,8 @@ export const api = {
   updateItem: (id, patch) =>
     request(`/watchlist/${id}`, { method: 'PATCH', body: patch }),
   deleteItem: (id) => request(`/watchlist/${id}`, { method: 'DELETE' }),
+  searchMedia: (query, signal) =>
+    request(`/media/search?q=${encodeURIComponent(query)}`, { signal }),
+  watchProviders: (mediaType, tmdbId) =>
+    request(`/media/providers/${mediaType}/${tmdbId}`),
 }

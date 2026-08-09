@@ -27,11 +27,44 @@ class AuthResponse(BaseModel):
 
 # --- Watchlist ---
 
+MediaType = Literal["movie", "tv"]
+
+
+class MediaCandidate(BaseModel):
+    """One suggestion in the Add form's title picker."""
+    tmdb_id: int
+    media_type: MediaType
+    title: str
+    year: Optional[int] = None
+    poster_thumb: Optional[str] = None
+
+
+class MediaSearchResponse(BaseModel):
+    results: list[MediaCandidate] = []
+    # Set when the lookup could not run (no API key, TMDB unreachable). The form
+    # stays usable in that case, so this is a note rather than an error status.
+    unavailable: Optional[str] = None
+
+
+class WatchProvidersResponse(BaseModel):
+    region: str
+    streaming: list[str] = []
+    rent: list[str] = []
+    buy: list[str] = []
+    link: Optional[str] = None
+    unavailable: Optional[str] = None
+
+
 class WatchlistItemCreate(BaseModel):
     title: str
     platform: str
     status: StatusType = "planning_to_watch"
     rating: Optional[int] = None
+
+    # Present when the user picked a suggestion, so enrichment can fetch that
+    # exact title instead of searching for the typed text again.
+    tmdb_id: Optional[int] = None
+    media_type: Optional[MediaType] = None
 
     @field_validator("rating")
     @classmethod

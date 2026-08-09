@@ -84,7 +84,12 @@ def enrich_item(db: Session, item, *, timeout=tmdb.ENRICH_TIMEOUT) -> Media | No
     creating a watchlist item must not depend on a third party being reachable.
     """
     try:
-        data = tmdb.search(item.title, media_type=item.media_type or "auto", timeout=timeout)
+        if item.tmdb_id and item.media_type:
+            # The user picked this title from the suggestions, so the identity is
+            # settled — searching the typed text again could land on a different show.
+            data = tmdb.details(item.tmdb_id, item.media_type, timeout=timeout)
+        else:
+            data = tmdb.search(item.title, media_type=item.media_type or "auto", timeout=timeout)
     except tmdb.TMDBError as exc:
         # First line only — the not-configured message is a multi-line set of
         # setup instructions that would swamp the log.

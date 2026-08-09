@@ -1,16 +1,62 @@
 import { useState } from 'react'
+import { api } from '../api'
 import { STATUS_META, STATUS_ORDER } from '../constants'
 import StarRating from './StarRating'
+import TitleSearchField from './TitleSearchField'
 
-const EMPTY = { title: '', platform: '', status: 'planning_to_watch', rating: null }
+const EMPTY = {
+  title: '',
+  platform: '',
+  status: 'planning_to_watch',
+  rating: null,
+  tmdb_id: null,
+  media_type: null,
+}
+
+// Sentinel for the escape hatch in the platform dropdown. Not a platform name,
+// so it can never collide with one TMDB returns.
+const OTHER = '__other__'
 
 export default function AddItemForm({ onCreate }) {
   const [form, setForm] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [platforms, setPlatforms] = useState([])
+  const [manualPlatform, setManualPlatform] = useState(true)
+  const [platformNote, setPlatformNote] = useState(null)
 
   function update(patch) {
     setForm((f) => ({ ...f, ...patch }))
+  }
+
+  function changeTitle(title) {
+    // Editing the title after picking must drop the stored identity, or the
+    // item would be saved carrying a different show's tmdb_id.
+    update({ title, tmdb_id: null, media_type: null })
+  }
+
+  async function pickTitle(candidate) {
+    update({ tmdb_id: candidate.tmdb_id, media_type: candidate.media_type })
+    setPlatforms([])
+    setPlatformNote(null)
+    try {
+      const data = await api.watchProviders(candidate.media_type, candidate.tmdb_id)
+      setPlatforms(data.streaming)
+      if (data.streaming.length > 0) {
+        setManualPlatform(false)
+        update({ platform: data.streaming[0] })
+      } else {
+        // Availability is region-specific and smaller markets have real gaps,
+        // so "nothing found" is ordinary — fall back to typing rather than
+        // showing an empty dropdown.
+        setManualPlatform(true)
+        setPlatformNote(
+          data.unavailable ?? `No streaming info for your region (${data.region}) — type it in.`,
+        )
+      }
+    } catch {
+      setManualPlatform(true)
+    }
   }
 
   async function submit(e) {
@@ -34,8 +80,13 @@ export default function AddItemForm({ onCreate }) {
         platform: form.platform.trim(),
         status: form.status,
         rating: form.status === 'finished' ? form.rating : null,
+        tmdb_id: form.tmdb_id,
+        media_type: form.media_type,
       })
       setForm(EMPTY)
+      setPlatforms([])
+      setManualPlatform(true)
+      setPlatformNote(null)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -50,23 +101,51 @@ export default function AddItemForm({ onCreate }) {
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Title</label>
-          <input
+          <label htmlFor="title" className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Title
+          </label>
+          <TitleSearchField
             value={form.title}
-            onChange={(e) => update({ title: e.target.value })}
-            placeholder="Severance"
-            className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
+            onChange={changeTitle}
+            onPick={pickTitle}
+            disabled={busy}
           />
         </div>
 
         <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">Platform</label>
-          <input
-            value={form.platform}
-            onChange={(e) => update({ platform: e.target.value })}
-            placeholder="Apple TV+"
-            className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
-          />
+          <label htmlFor="platform" className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+            Platform
+          </label>
+          {manualPlatform ? (
+            <input
+              id="platform"
+              value={form.platform}
+              onChange={(e) => update({ platform: e.target.value })}
+              placeholder="Apple TV+"
+              className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950 dark:placeholder-slate-600"
+            />
+          ) : (
+            <select
+              id="platform"
+              value={form.platform}
+              onChange={(e) => {
+                if (e.target.value === OTHER) {
+                  setManualPlatform(true)
+                  update({ platform: '' })
+                } else {
+                  update({ platform: e.target.value })
+                }
+              }}
+              className="mt-1 w-full rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-950"
+            >
+              {platforms.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+              <option value={OTHER}>Other…</option>
+            </select>
+          )}
         </div>
 
         <div className="sm:w-48">
@@ -97,6 +176,17 @@ export default function AddItemForm({ onCreate }) {
           {busy ? 'Adding…' : 'Add'}
         </button>
       </div>
+
+      {platformNote && (
+        <p className="mt-2 text-xs text-slate-500">{platformNote}</p>
+      )}
+
+      {platforms.length > 0 && !manualPlatform && (
+        // TMDB's terms require crediting JustWatch wherever provider data is shown.
+        <p className="mt-2 text-xs text-slate-500">
+          Streaming availability for your region, via TMDB and JustWatch.
+        </p>
+      )}
 
       {form.status === 'finished' && (
         <div className="mt-3 flex items-center gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">

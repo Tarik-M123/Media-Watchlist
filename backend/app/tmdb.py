@@ -22,6 +22,8 @@ IMAGE_BASE = "https://image.tmdb.org/t/p"
 # card grid gets w500 instead.
 POSTER_SIZE_CARD = "w500"
 POSTER_SIZE_LARGE = "original"
+# Small enough for a search-suggestion row, where a dozen load at once.
+POSTER_SIZE_THUMB = "w185"
 
 TIMEOUT = httpx.Timeout(15.0)
 
@@ -123,6 +125,96 @@ def search(title: str, media_type: str = "auto", year: int | None = None, timeou
         details = _get(client, f"/{resolved_type}/{best['id']}", {}, timeout)
 
     return _normalise(details, resolved_type)
+
+
+def details(tmdb_id: int, media_type: str, timeout=TIMEOUT) -> dict:
+    """Fetch one known title directly, skipping the search step.
+
+    Used when the user picked from the suggestions, so the identity is already
+    settled and guessing at a best match would only add a way to be wrong.
+    """
+    if media_type not in ("movie", "tv"):
+        raise TMDBError(f"media_type must be 'movie' or 'tv' (got {media_type!r})")
+    with httpx.Client() as client:
+        payload = _get(client, f"/{media_type}/{tmdb_id}", {}, timeout)
+    return _normalise(payload, media_type)
+
+
+def search_candidates(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]:
+    """Titles matching `query`, best first, for the Add form's suggestion list.
+
+    Deliberately lighter than search(): no per-title details call, so this stays
+    cheap enough to run while somebody is typing.
+    """
+    query = (query or "").strip()
+    if len(query) < 2:
+        return []
+
+    with httpx.Client() as client:
+        results = _get(client, "/search/multi", {"query": query}, timeout).get("results", [])
+
+    candidates = []
+    for r in results:
+        media_type = r.get("media_type")
+        if media_type not in ("movie", "tv"):
+            continue
+        date = (r.get("release_date") if media_type == "movie" else r.get("first_air_date")) or ""
+        title = (
+            r.get("title") or r.get("original_title")
+            if media_type == "movie"
+            else r.get("name") or r.get("original_name")
+        )
+        if not title:
+            continue
+        candidates.append({
+            "tmdb_id": r.get("id"),
+            "media_type": media_type,
+            "title": title,
+            "year": int(date[:4]) if date[:4].isdigit() else None,
+            "poster_thumb": poster_url(r.get("poster_path"), size=POSTER_SIZE_THUMB),
+            "popularity": r.get("popularity") or 0,
+        })
+
+    # Same ordering rule as search(): popularity settles short or ambiguous
+    # queries far more reliably than TMDB's relevance ranking.
+    candidates.sort(key=lambda c: c["popularity"], reverse=True)
+    for c in candidates:
+        c.pop("popularity")
+    return candidates[:limit]
+
+
+def watch_providers(tmdb_id: int, media_type: str, region: str, timeout=TIMEOUT) -> dict:
+    """Where a title can be watched in `region`.
+
+    TMDB sources this from JustWatch and keys it by country, so a title can be
+    widely available yet have nothing for a smaller market. That is an ordinary
+    outcome, not an error: the caller gets empty lists.
+    """
+    if media_type not in ("movie", "tv"):
+        raise TMDBError(f"media_type must be 'movie' or 'tv' (got {media_type!r})")
+
+    with httpx.Client() as client:
+        payload = _get(client, f"/{media_type}/{tmdb_id}/watch/providers", {}, timeout)
+
+    block = (payload.get("results") or {}).get(region.upper()) or {}
+
+    def names(key: str) -> list[str]:
+        entries = block.get(key) or []
+        entries.sort(key=lambda p: p.get("display_priority", 999))
+        # dict.fromkeys keeps first-seen order while dropping duplicates.
+        return list(dict.fromkeys(p["provider_name"] for p in entries if p.get("provider_name")))
+
+    # Subscription and free tiers are what "where is it streaming" means; rent
+    # and buy are a different question and are kept apart rather than merged in.
+    streaming = names("flatrate") + [n for n in names("free") + names("ads") if n not in names("flatrate")]
+
+    return {
+        "region": region.upper(),
+        "streaming": streaming,
+        "rent": names("rent"),
+        "buy": names("buy"),
+        "link": block.get("link"),
+    }
 
 
 def _normalise(d: dict, media_type: str) -> dict:

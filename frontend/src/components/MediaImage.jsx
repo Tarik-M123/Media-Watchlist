@@ -8,11 +8,13 @@ const SIZES = {
   // the poster takes comes straight out of the title.
   card: 'w-12 sm:w-14',
   large: 'w-40 sm:w-56',
+  thumb: 'w-8',
 }
 
 const INITIAL_TEXT = {
   card: 'text-base',
   large: 'text-5xl',
+  thumb: 'text-[11px]',
 }
 
 export default function MediaImage({ src, title, size = 'card' }) {
