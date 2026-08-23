@@ -7,10 +7,12 @@ item must still be created. Callers get None rather than an exception.
 
 import logging
 
+from datetime import datetime, timezone
+
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app import tmdb
+from app import embeddings, tmdb
 from app.models import Media, MediaPoster
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,9 @@ def _upsert_media(db: Session, data: dict) -> Media | None:
         "runtime_minutes": data.get("runtime_minutes"),
         "genres": data.get("genres") or None,
         "synopsis": data.get("synopsis"),
+        # Fetched by tmdb._normalise since 001 and discarded until migration 003
+        # gave it somewhere to live.
+        "vote_average": data.get("vote_average"),
     }
 
     # DO NOTHING rather than DO UPDATE: a later lookup of the same title should
@@ -77,6 +82,41 @@ def _record_posters(db: Session, media: Media, poster_path: str | None) -> None:
         )
 
 
+def record_embedding(db: Session, media: Media, *, force: bool = False) -> bool:
+    """Compute and store the semantic fingerprint for one catalogue entry.
+
+    Returns True if a vector was written. Never raises: semantic search is an
+    accelerator, and a missing model must not cost the caller its catalogue row.
+    The vector is assigned only after the model returns, so a failure leaves the
+    surrounding transaction untouched rather than half-written.
+
+    Skips rows that already carry a current vector unless `force` is set.
+    _upsert_media never rewrites an existing row's text, so for anything reached
+    through enrich_item a present vector is by definition still accurate.
+    """
+    if not force and media.embedding and media.embedding_model == embeddings.MODEL_NAME:
+        return False
+
+    try:
+        vectors = embeddings.embed_documents([embeddings.document_for(media)])
+    except embeddings.EmbeddingsUnavailable as exc:
+        # First line only: the not-installed message is multi-line setup
+        # instructions meant for a developer, not a log.
+        logger.info("Embedding skipped for %r: %s", media.title, str(exc).splitlines()[0])
+        return False
+    except Exception:
+        logger.exception("Unexpected embedding failure for %r", media.title)
+        return False
+
+    if not vectors:
+        return False
+
+    media.embedding = vectors[0]
+    media.embedding_model = embeddings.MODEL_NAME
+    media.embedding_updated_at = datetime.now(timezone.utc)
+    return True
+
+
 def enrich_item(db: Session, item, *, timeout=tmdb.ENRICH_TIMEOUT) -> Media | None:
     """Look the item's title up on TMDB and attach it to the catalogue.
 
@@ -105,6 +145,9 @@ def enrich_item(db: Session, item, *, timeout=tmdb.ENRICH_TIMEOUT) -> Media | No
             return None
 
         _record_posters(db, media, data.get("poster_path"))
+        # Swallows its own failures, so a missing embedding model costs the
+        # semantic search and nothing else.
+        record_embedding(db, media)
 
         item.media_id = media.id
         # Mirror the metadata onto the item too, so existing consumers that read

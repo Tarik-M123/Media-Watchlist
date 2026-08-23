@@ -4,6 +4,7 @@ from sqlalchemy import (
     CheckConstraint,
     Computed,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -112,6 +113,15 @@ class WatchlistItem(Base):
             return self.poster_url
         return self._poster_of_size("original") or self.display_poster_url
 
+    @property
+    def vote_average(self) -> float | None:
+        """TMDB's public score, which lives on the shared catalogue row.
+
+        None for items that never resolved to a catalogue entry, and for rows
+        catalogued before migration 003 added the column.
+        """
+        return self.media.vote_average if self.media else None
+
 
 class Media(Base):
     """One row per real-world title, shared by every user tracking it."""
@@ -123,6 +133,12 @@ class Media(Base):
         CheckConstraint("runtime_minutes IS NULL OR runtime_minutes > 0", name="ck_media_runtime"),
         CheckConstraint("year IS NULL OR year BETWEEN 1888 AND 2100", name="ck_media_year"),
         CheckConstraint("tmdb_id IS NULL OR tmdb_id > 0", name="ck_media_tmdb_id"),
+        CheckConstraint("vote_average IS NULL OR vote_average BETWEEN 0 AND 10",
+                        name="ck_media_vote_average"),
+        # A vector with no model recorded cannot be compared against anything,
+        # because nothing establishes what it is comparable with.
+        CheckConstraint("embedding IS NULL OR embedding_model IS NOT NULL",
+                        name="ck_media_embedding_provenance"),
         Index("uq_media_tmdb", "tmdb_id", "media_type", unique=True,
               postgresql_where=text("tmdb_id IS NOT NULL")),
         Index("uq_media_title_key", "title_key", "media_type", text("COALESCE(year, -1)"),
@@ -144,6 +160,19 @@ class Media(Base):
     runtime_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     genres: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     synopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # TMDB's 0-10 community score. Distinct from WatchlistItem.rating, which is
+    # one user's 1-5 opinion: a title has one vote_average and as many ratings
+    # as it has viewers.
+    vote_average: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Semantic fingerprint of this title — see migrations/003 and
+    # app/embeddings.py. Only comparable against vectors sharing
+    # embedding_model, which is why the model name is stored beside it.
+    embedding: Mapped[list[float] | None] = mapped_column(ARRAY(Float), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embedding_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False)

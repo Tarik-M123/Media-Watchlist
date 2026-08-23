@@ -133,6 +133,11 @@ class WatchlistItemResponse(BaseModel):
     genres: Optional[list[str]] = None
     synopsis: Optional[str] = None
 
+    # TMDB's public 0-10 score, read off the shared catalogue row. Null for
+    # items that never resolved to one, and for rows catalogued before
+    # migration 003 added the column.
+    vote_average: Optional[float] = None
+
     # Posters. Already resolved server-side (per-user override, then the
     # catalogue winner), so the frontend just renders the URL or falls back to a
     # placeholder when it is null.
@@ -162,3 +167,34 @@ class DashboardStats(BaseModel):
 class DashboardResponse(BaseModel):
     stats: DashboardStats
     items: dict[str, list[WatchlistItemResponse]]
+
+
+# --- Assistant ---
+
+class AssistantTurn(BaseModel):
+    """One prior exchange, replayed so follow-up questions have context."""
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AssistantAskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000)
+    # Capped because the whole history is resent on every turn and each one
+    # costs tokens. Long conversations lose their oldest turns, not the thread.
+    history: list[AssistantTurn] = Field(default_factory=list, max_length=20)
+
+
+class AssistantSource(BaseModel):
+    """A watchlist item the answer was actually built from."""
+    id: int
+    title: str
+    year: Optional[int] = None
+
+
+class AssistantResponse(BaseModel):
+    answer: str = ""
+    sources: list[AssistantSource] = []
+    # Set when the assistant could not run at all (no API key, model missing).
+    # Like MediaSearchResponse.unavailable this is a note rather than an error
+    # status, so the panel explains itself instead of the page breaking.
+    unavailable: Optional[str] = None

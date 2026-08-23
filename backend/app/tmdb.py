@@ -10,6 +10,7 @@ Accepts either credential TMDB hands out:
 """
 
 import os
+import re
 from typing import Any
 
 import httpx
@@ -140,6 +141,43 @@ def details(tmdb_id: int, media_type: str, timeout=TIMEOUT) -> dict:
     return _normalise(payload, media_type)
 
 
+def _multi_rows(results: list[dict]) -> list[dict]:
+    """Flatten /search/multi hits into rows, popularity-ordered.
+
+    Shared by search_candidates (the Add form's picker) and search_titles (the
+    assistant's context), because the two want the same normalisation and only
+    differ in which fields they keep. A second copy of this would drift.
+    """
+    rows = []
+    for r in results:
+        media_type = r.get("media_type")
+        if media_type not in ("movie", "tv"):
+            continue
+        date = (r.get("release_date") if media_type == "movie" else r.get("first_air_date")) or ""
+        title = (
+            r.get("title") or r.get("original_title")
+            if media_type == "movie"
+            else r.get("name") or r.get("original_name")
+        )
+        if not title:
+            continue
+        rows.append({
+            "tmdb_id": r.get("id"),
+            "media_type": media_type,
+            "title": title,
+            "year": int(date[:4]) if date[:4].isdigit() else None,
+            "poster_path": r.get("poster_path"),
+            "synopsis": r.get("overview") or None,
+            "vote_average": round(r["vote_average"], 1) if r.get("vote_average") else None,
+            "popularity": r.get("popularity") or 0,
+        })
+
+    # Same ordering rule as search(): popularity settles short or ambiguous
+    # queries far more reliably than TMDB's relevance ranking.
+    rows.sort(key=lambda c: c["popularity"], reverse=True)
+    return rows
+
+
 def search_candidates(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]:
     """Titles matching `query`, best first, for the Add form's suggestion list.
 
@@ -153,34 +191,133 @@ def search_candidates(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]
     with httpx.Client() as client:
         results = _get(client, "/search/multi", {"query": query}, timeout).get("results", [])
 
-    candidates = []
-    for r in results:
-        media_type = r.get("media_type")
-        if media_type not in ("movie", "tv"):
-            continue
-        date = (r.get("release_date") if media_type == "movie" else r.get("first_air_date")) or ""
-        title = (
-            r.get("title") or r.get("original_title")
-            if media_type == "movie"
-            else r.get("name") or r.get("original_name")
-        )
-        if not title:
-            continue
-        candidates.append({
-            "tmdb_id": r.get("id"),
-            "media_type": media_type,
-            "title": title,
-            "year": int(date[:4]) if date[:4].isdigit() else None,
-            "poster_thumb": poster_url(r.get("poster_path"), size=POSTER_SIZE_THUMB),
-            "popularity": r.get("popularity") or 0,
-        })
+    return [
+        {
+            "tmdb_id": row["tmdb_id"],
+            "media_type": row["media_type"],
+            "title": row["title"],
+            "year": row["year"],
+            "poster_thumb": poster_url(row["poster_path"], size=POSTER_SIZE_THUMB),
+        }
+        for row in _multi_rows(results)[:limit]
+    ]
 
-    # Same ordering rule as search(): popularity settles short or ambiguous
-    # queries far more reliably than TMDB's relevance ranking.
-    candidates.sort(key=lambda c: c["popularity"], reverse=True)
-    for c in candidates:
-        c.pop("popularity")
-    return candidates[:limit]
+
+def search_titles(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]:
+    """Several titles matching `query`, not just the single best one.
+
+    search() answers "which title is this?" and returns one row. This answers
+    "what is there like this?" and returns many — which is what a question such
+    as "what films have Batman in them?" actually wants.
+
+    TMDB's keyword index looks like the right tool for that and is not: the
+    `batman` keyword exists and matches zero films. Plain multi-search returns
+    the franchise correctly, so that is what this uses.
+    """
+    query = (query or "").strip()
+    if len(query) < 2:
+        return []
+
+    with httpx.Client() as client:
+        results = _get(client, "/search/multi", {"query": query}, timeout).get("results", [])
+
+    rows = _multi_rows(results)[:limit]
+    for row in rows:
+        row.pop("popularity", None)
+        row.pop("poster_path", None)
+    return rows
+
+
+# Below this, a "person" match is a namesake with almost no credits rather than
+# the public figure being asked about — TMDB returns both for a common name.
+PERSON_MIN_POPULARITY = 1.0
+
+# Per-person credit cap. Prolific actors have hundreds of credits; the most
+# popular handful is what a question is ever actually about.
+PERSON_CREDIT_LIMIT = 10
+
+
+def search_person(name: str, timeout=TIMEOUT) -> dict | None:
+    """A person and their best-known credits, or None if nobody matches.
+
+    Returns directing and acting credits separately, because "films by X" and
+    "films with X" are different questions and conflating them answers neither.
+    """
+    name = (name or "").strip()
+    if len(name) < 2:
+        return None
+
+    def name_matches(candidate: str) -> bool:
+        """Whether a returned person is plausibly who was asked for.
+
+        TMDB matches on aliases and nicknames, so it answers a search for the
+        character "Iron Man" with Mike Tyson — "Iron Mike" — at high popularity.
+        A confident wrong answer is worse than none here, because a person match
+        suppresses the title search that would have found the actual films.
+        Requiring every searched word to appear in the returned name rejects
+        that while still allowing a surname-only search to match a full name.
+        """
+        candidate = (candidate or "").lower()
+        words = [w for w in re.findall(r"[\w']+", name.lower()) if len(w) >= 3]
+        return bool(words) and all(w in candidate for w in words)
+
+    with httpx.Client() as client:
+        found = _get(client, "/search/person", {"query": name}, timeout).get("results", [])
+        people = [
+            p for p in found
+            if (p.get("popularity") or 0) >= PERSON_MIN_POPULARITY and name_matches(p.get("name"))
+        ]
+        if not people:
+            return None
+        person = max(people, key=lambda p: p.get("popularity") or 0)
+        credits = _get(client, f"/person/{person['id']}/combined_credits", {}, timeout)
+
+    def is_real_role(entry: dict) -> bool:
+        """Drop appearances-as-themselves, which are not filmography.
+
+        Talk shows dominate a working actor's credits by popularity — querying
+        Cillian Murphy returns three chat shows above Peaky Blinders — and
+        listing them answers nobody's question about what someone has been in.
+        TMDB marks them by naming the character "Self", and a one-episode TV
+        credit is a guest spot by another name.
+        """
+        character = (entry.get("character") or "").lower()
+        if "self" in character or "himself" in character or "herself" in character:
+            return False
+        # Directors turn up in their own films as walk-ons — Spielberg is a
+        # lifeguard in Jaws and an alien on a TV monitor in Men in Black. Real
+        # credits, useless as an answer to "what is he in?".
+        if "uncredited" in character:
+            return False
+        if entry.get("media_type") == "tv" and (entry.get("episode_count") or 0) == 1:
+            return False
+        # A cast credit with no character named is almost always an appearance
+        # as themselves that TMDB simply left blank — talk shows, awards nights,
+        # documentaries. Crew entries carry "job" instead and are exempt.
+        if "job" not in entry and not (entry.get("character") or "").strip():
+            return False
+        return True
+
+    def top(entries: list[dict]) -> list[dict]:
+        entries = [e for e in entries if is_real_role(e)]
+        entries.sort(key=lambda e: e.get("popularity") or 0, reverse=True)
+        out = []
+        for e in entries[:PERSON_CREDIT_LIMIT]:
+            date = e.get("release_date") or e.get("first_air_date") or ""
+            out.append({
+                "title": e.get("title") or e.get("name"),
+                "year": int(date[:4]) if date[:4].isdigit() else None,
+                "media_type": e.get("media_type"),
+                "character": e.get("character") or None,
+            })
+        return [o for o in out if o["title"]]
+
+    return {
+        "name": person.get("name"),
+        "known_for": person.get("known_for_department"),
+        "directed": top([c for c in credits.get("crew", []) if c.get("job") == "Director"]),
+        "acted_in": top(list(credits.get("cast", []))),
+    }
 
 
 def watch_providers(tmdb_id: int, media_type: str, region: str, timeout=TIMEOUT) -> dict:

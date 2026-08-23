@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { STATUS_META, STATUS_ORDER } from '../constants'
 import AddItemForm from './AddItemForm'
+import AssistantPanel from './AssistantPanel'
 import Clock from './Clock'
 import ItemCard from './ItemCard'
 import StatsBar from './StatsBar'
@@ -125,6 +126,10 @@ export default function Dashboard({ user, onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Fixed-position widget, so it sits outside the content flow and stays
+          reachable regardless of how far the lists scroll. */}
+      <AssistantPanel />
     </div>
   )
 }

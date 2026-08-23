@@ -76,4 +76,6 @@ export const api = {
     request(`/media/search?q=${encodeURIComponent(query)}`, { signal }),
   watchProviders: (mediaType, tmdbId) =>
     request(`/media/providers/${mediaType}/${tmdbId}`),
+  askAssistant: (question, history = []) =>
+    request('/assistant/ask', { method: 'POST', body: { question, history } }),
 }
