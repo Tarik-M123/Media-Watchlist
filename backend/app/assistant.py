@@ -570,13 +570,25 @@ def _to_history(history) -> list[types.Content]:
     ]
 
 
-def _generate(client: genai.Client, prompt: str, history) -> types.GenerateContentResponse:
-    """Send the prompt, moving to the next model only when one is rate-limited.
+# Statuses that say "this model, right now" rather than "your request".
+#
+# 429 means this model's free-tier allowance is spent; the quota is dimensioned
+# per model, so the next entry has its own. 503 means the model is overloaded —
+# "this model is currently experiencing high demand" — which is equally specific
+# to one model: observed with gemini-flash-latest returning 503 while both
+# fallbacks answered normally in the same second.
+#
+# A bad key (401/403) or an unknown model (404) fails identically on every
+# entry, so those still raise immediately rather than retrying to reach the same
+# conclusion slower.
+RETRY_NEXT_MODEL = {429, 500, 502, 503, 504}
 
-    A 429 says this model's allowance is spent, which the next model's is not.
-    Anything else — a bad key, an unknown model, a server fault — would fail
-    identically on every entry, so it is raised immediately rather than retried
-    two more times to reach the same conclusion slower.
+
+def _generate(client: genai.Client, prompt: str, history) -> types.GenerateContentResponse:
+    """Send the prompt, moving to the next model when one is unavailable.
+
+    Advances on the statuses in RETRY_NEXT_MODEL, which are the ones a different
+    model can plausibly succeed at. Everything else raises on the first attempt.
     """
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
@@ -589,9 +601,10 @@ def _generate(client: genai.Client, prompt: str, history) -> types.GenerateConte
             chat = client.chats.create(model=model, config=config, history=_to_history(history))
             return chat.send_message(prompt)
         except Exception as exc:
-            if getattr(exc, "code", None) != 429:
+            code = getattr(exc, "code", None)
+            if code not in RETRY_NEXT_MODEL:
                 raise
-            logger.info("%s is rate-limited, trying the next model", model)
+            logger.info("%s unavailable (%s), trying the next model", model, code)
             last = exc
 
     raise last  # every model exhausted; _explain turns this into the 429 message
