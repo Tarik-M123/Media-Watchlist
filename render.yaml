@@ -1,5 +1,10 @@
 # Render Blueprint. In Render: New -> Blueprint -> pick this repo.
 #
+# region: frankfurt on all three. The default is Oregon, which is ~150-200ms
+# from Bosnia; Frankfurt is ~30ms, and every UI action here costs a request plus
+# a refetch. All three must match, because the API reaches Postgres over
+# Render's internal network. A region cannot be changed after creation.
+#
 # Two values cannot be set here because each service needs the other's URL and
 # Render only assigns those at creation. After the first deploy, set them in the
 # dashboard and redeploy both:
@@ -13,6 +18,7 @@
 databases:
   - name: media-watchlist-db
     plan: free
+    region: frankfurt
     databaseName: media_watchlist
     user: watchlist
 
@@ -21,6 +27,7 @@ services:
     name: media-watchlist-api
     runtime: python
     plan: free
+    region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements-deploy.txt
     # Base.metadata.create_all runs at import, so the tables build themselves on
@@ -48,6 +55,7 @@ services:
   - type: web
     name: media-watchlist-web
     runtime: static
+    region: frankfurt
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
