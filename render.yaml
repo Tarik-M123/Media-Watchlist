@@ -1,9 +1,10 @@
 # Render Blueprint. In Render: New -> Blueprint -> pick this repo.
 #
-# region: frankfurt on all three. The default is Oregon, which is ~150-200ms
-# from Bosnia; Frankfurt is ~30ms, and every UI action here costs a request plus
-# a refetch. All three must match, because the API reaches Postgres over
-# Render's internal network. A region cannot be changed after creation.
+# region: frankfurt on the API and the database. The default is Oregon, which is
+# ~150-200ms from Bosnia; Frankfurt is ~30ms, and every UI action here costs a
+# request plus a refetch. Those two must match, because the API reaches Postgres
+# over Render's internal network, and a region cannot be changed after creation.
+# The static site takes no region — Render serves it from a global CDN.
 #
 # Two values cannot be set here because each service needs the other's URL and
 # Render only assigns those at creation. After the first deploy, set them in the
@@ -55,7 +56,6 @@ services:
   - type: web
     name: media-watchlist-web
     runtime: static
-    region: frankfurt
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
