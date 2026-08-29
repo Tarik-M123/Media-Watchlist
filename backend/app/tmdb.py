@@ -343,7 +343,8 @@ def watch_providers(tmdb_id: int, media_type: str, region: str, timeout=TIMEOUT)
 
     # Subscription and free tiers are what "where is it streaming" means; rent
     # and buy are a different question and are kept apart rather than merged in.
-    streaming = names("flatrate") + [n for n in names("free") + names("ads") if n not in names("flatrate")]
+    flatrate = names("flatrate")
+    streaming = flatrate + [n for n in names("free") + names("ads") if n not in flatrate]
 
     return {
         "region": region.upper(),

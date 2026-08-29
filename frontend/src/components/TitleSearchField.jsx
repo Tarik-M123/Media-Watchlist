@@ -16,7 +16,6 @@ export default function TitleSearchField({ value, onChange, onPick, disabled = f
   // typing" from "we just filled the box in" and skip searching for our own text.
   const justPicked = useRef(false)
   const listId = useId()
-  const boxRef = useRef(null)
 
   useEffect(() => {
     if (justPicked.current) {
@@ -86,7 +85,7 @@ export default function TitleSearchField({ value, onChange, onPick, disabled = f
   }
 
   return (
-    <div ref={boxRef} className="relative">
+    <div className="relative">
       <input
         id="title"
         value={value}

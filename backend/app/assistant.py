@@ -30,7 +30,7 @@ import re
 
 from google import genai
 from google.genai import types
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import embeddings, models, tmdb
 
@@ -429,6 +429,10 @@ def _build_context(db: Session, user: models.User, question: str) -> str:
     """Everything Gemini is allowed to answer from, assembled without a network call."""
     items = (
         db.query(models.WatchlistItem)
+        # Every index line reads item.media for the TMDB score, and the detail
+        # pass reads it again for synopses and embeddings. Lazy-loading makes
+        # that one query per row — 401 of them at INDEX_LIMIT.
+        .options(selectinload(models.WatchlistItem.media))
         .filter(models.WatchlistItem.user_id == user.id)
         .order_by(models.WatchlistItem.title)
         .limit(INDEX_LIMIT)
