@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,9 +21,17 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Media Watchlist API", version="1.0.0")
 
+# The deployed frontend lives on a different origin than localhost, and the
+# browser blocks it unless that origin is named here. Comma-separated so a
+# preview deployment can be allowed alongside production.
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

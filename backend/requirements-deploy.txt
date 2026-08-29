@@ -1,0 +1,23 @@
+# Deployment requirements: requirements.txt without fastembed.
+#
+# fastembed pulls an ONNX runtime and downloads a 67 MB model on first use,
+# which costs ~190 MB resident and a slow cold start. On a free tier with an
+# ephemeral disk that download repeats every time the service wakes.
+#
+# Leaving it out is safe by design: embeddings.py imports fastembed lazily,
+# inside _load(), and raises EmbeddingsUnavailable when it is missing. Both
+# callers catch that, so the app runs and the assistant still answers factual
+# questions — it only loses mood-based semantic matching.
+#
+# numpy is NOT optional: embeddings.py imports it at module level, and
+# assistant.py and media_catalogue.py import embeddings at module level.
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+pydantic[email]==2.13.4
+python-jose[cryptography]==3.3.0
+python-dotenv==1.0.1
+httpx==0.28.1
+google-genai==2.18.1
+numpy==2.4.6

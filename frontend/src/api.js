@@ -1,4 +1,7 @@
-const BASE_URL = 'http://127.0.0.1:8000'
+// Set VITE_API_URL at build time to point the app at a deployed API. Vite
+// inlines it into the bundle, so it is baked in when `npm run build` runs and
+// cannot be changed afterwards without rebuilding.
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
 const TOKEN_KEY = 'mw_token'
 

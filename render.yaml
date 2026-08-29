@@ -1,0 +1,61 @@
+# Render Blueprint. In Render: New -> Blueprint -> pick this repo.
+#
+# Two values cannot be set here because each service needs the other's URL and
+# Render only assigns those at creation. After the first deploy, set them in the
+# dashboard and redeploy both:
+#
+#   media-watchlist-api  ALLOWED_ORIGINS = https://<the static site URL>
+#   media-watchlist-web  VITE_API_URL    = https://<the api URL>
+#
+# VITE_API_URL is inlined at build time, so the frontend must be rebuilt after
+# setting it — a redeploy does that.
+
+databases:
+  - name: media-watchlist-db
+    plan: free
+    databaseName: media_watchlist
+    user: watchlist
+
+services:
+  - type: web
+    name: media-watchlist-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements-deploy.txt
+    # Base.metadata.create_all runs at import, so the tables build themselves on
+    # first boot. The numbered files in migrations/ are only needed for the
+    # media_primary_poster view, which the API never reads.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: media-watchlist-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true          # never the repo's public fallback
+      - key: ALLOWED_ORIGINS
+        sync: false                  # set to the static site URL after deploy
+      - key: TMDB_API_KEY
+        sync: false                  # posters and title search; app runs without
+      - key: GEMINI_API_KEY
+        sync: false                  # assistant; panel explains itself without
+      - key: WATCH_REGION
+        value: BA
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  - type: web
+    name: media-watchlist-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false                  # set to the API URL after deploy
+    routes:
+      # Single-page app: every path must serve index.html or a refresh 404s.
+      - type: rewrite
+        source: /*
+        destination: /index.html
