@@ -1,0 +1,117 @@
+{
+  "name": "Stale \"watching\" nudge",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 18,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Weekly (Sun 18:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Every user's items stuck in \"watching\", with their email address.\n-- Read-only: this SELECT cannot alter application data.\nSELECT u.email,\n       w.title,\n       w.platform,\n       (CURRENT_DATE - w.updated_at::date) AS days_idle,\n       COALESCE(w.poster_url, mp.url)      AS poster\nFROM watchlist w\nJOIN users u ON u.id = w.user_id\nLEFT JOIN media_primary_poster mp ON mp.media_id = w.media_id\nWHERE w.status = 'watching'\n  AND w.updated_at < now() - interval '14 days'\n  -- Guard: this database holds seed/QA accounts. @example.com is IANA-reserved\n  -- and hard-bounces, which damages sender reputation. Drop these two lines once\n  -- the test users are gone.\n  AND u.email NOT LIKE '%@example.com'\n  AND u.email NOT LIKE '%.local'\nORDER BY u.email, w.updated_at;",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Find stale",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Read-only SELECT. Set the Postgres credential here."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// One output item per user -> n8n sends one email each.\n// No rows in means no items out, so nobody receives an empty nudge.\nconst byUser = new Map();\nfor (const { json: r } of $input.all()) {\n  if (!byUser.has(r.email)) byUser.set(r.email, []);\n  byUser.get(r.email).push(r);\n}\n\n// Titles and platforms are free text typed by users, so they are escaped\n// before going anywhere near an HTML email body.\nconst esc = (s) => String(s ?? '').replace(/[&<>\"]/g, (c) =>\n  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\n\nreturn [...byUser].map(([email, items]) => {\n  const rows = items.map((i) => `\n    <tr>\n      <td style=\"padding:8px 12px 8px 0;vertical-align:top\">${\n        i.poster ? `<img src=\"${esc(i.poster)}\" alt=\"\" width=\"46\" style=\"border-radius:6px;display:block\">` : ''\n      }</td>\n      <td style=\"padding:8px 0;vertical-align:top\">\n        <div style=\"font-weight:600;color:#0f172a\">${esc(i.title)}</div>\n        <div style=\"font-size:13px;color:#64748b\">${esc(i.platform)} &middot; idle ${i.days_idle} days</div>\n      </td>\n    </tr>`).join('');\n\n  const html = `<div style=\"font-family:system-ui,-apple-system,sans-serif;max-width:520px\">\n  <p style=\"color:#0f172a\">You have <strong>${items.length}</strong> title${items.length === 1 ? '' : 's'} still marked <em>watching</em>:</p>\n  <table cellpadding=\"0\" cellspacing=\"0\">${rows}</table>\n  <p style=\"font-size:12px;color:#94a3b8\">Finish them or drop them &mdash; either way the list gets honest again.</p>\n</div>`;\n\n  return { json: { email, count: items.length, html } };\n});"
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Group by user",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "CHANGE_ME@your-domain",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.count }} title(s) still marked watching",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Send nudge",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        0
+      ],
+      "notes": "SMTP. Swap for the Gmail node if the SENDING account is Google."
+    }
+  ],
+  "connections": {
+    "Weekly (Sun 18:00)": {
+      "main": [
+        [
+          {
+            "node": "Find stale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find stale": {
+      "main": [
+        [
+          {
+            "node": "Group by user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group by user": {
+      "main": [
+        [
+          {
+            "node": "Send nudge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
