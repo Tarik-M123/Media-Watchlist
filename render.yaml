@@ -87,7 +87,10 @@ services:
     plan: free
     region: frankfurt
     image:
-      url: docker.n8n.io/n8nio/n8n
+      # Docker Hub, not docker.n8n.io — Render cannot fetch from n8n's own
+      # registry mirror. Pinned to the version verified locally rather than
+      # :latest, so a new n8n release cannot change behaviour mid-week.
+      url: docker.io/n8nio/n8n:2.36.8
     envVars:
       - key: DB_TYPE
         value: postgresdb
