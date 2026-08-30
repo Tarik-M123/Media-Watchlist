@@ -67,3 +67,62 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # n8n, deployed rather than run on a laptop. Two things make this work on a
+  # free instance:
+  #
+  #   * Its state lives in Postgres (DB_TYPE=postgresdb), not on disk. Render's
+  #     free filesystem is wiped on every restart — including every sleep/wake —
+  #     so SQLite would lose the workflow and its credentials silently.
+  #   * It reuses the app's database under its own `n8n` schema, because a
+  #     workspace only gets one free Postgres. The schema must exist first:
+  #         CREATE SCHEMA IF NOT EXISTS n8n;
+  #
+  # It still sleeps after 15 min idle, so the Sunday schedule is not reliable
+  # here. Opening the UI wakes it and Execute Workflow runs on demand, which is
+  # what a demo needs.
+  - type: web
+    name: n8n
+    runtime: image
+    plan: free
+    region: frankfurt
+    image:
+      url: docker.n8n.io/n8nio/n8n
+    envVars:
+      - key: DB_TYPE
+        value: postgresdb
+      - key: DB_POSTGRESDB_HOST
+        fromDatabase:
+          name: media-watchlist-db
+          property: host
+      - key: DB_POSTGRESDB_PORT
+        fromDatabase:
+          name: media-watchlist-db
+          property: port
+      - key: DB_POSTGRESDB_DATABASE
+        fromDatabase:
+          name: media-watchlist-db
+          property: database
+      - key: DB_POSTGRESDB_USER
+        fromDatabase:
+          name: media-watchlist-db
+          property: user
+      - key: DB_POSTGRESDB_PASSWORD
+        fromDatabase:
+          name: media-watchlist-db
+          property: password
+      - key: DB_POSTGRESDB_SCHEMA
+        value: n8n
+      # Must stay stable: it decrypts stored credentials. Change it and the
+      # saved Postgres and SMTP credentials become unreadable.
+      - key: N8N_ENCRYPTION_KEY
+        generateValue: true
+      - key: GENERIC_TIMEZONE
+        value: Europe/Sarajevo
+      - key: TZ
+        value: Europe/Sarajevo
+      # n8n binds N8N_PORT, not Render's PORT, so the two are pinned together.
+      - key: N8N_PORT
+        value: "10000"
+      - key: PORT
+        value: "10000"
