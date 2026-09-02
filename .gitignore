@@ -17,6 +17,10 @@ dist/
 dist-ssr/
 *.local
 
+# Playwright MCP scratch output — page snapshots and console logs written
+# during browser-driven QA runs. Transient debris, not project files.
+.playwright-mcp/
+
 # Editors / tooling
 # Local Claude Code config — contains machine-specific paths and permissions.
 .claude/
