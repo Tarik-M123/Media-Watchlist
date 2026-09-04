@@ -178,18 +178,45 @@ def _multi_rows(results: list[dict]) -> list[dict]:
     return rows
 
 
+# People type "The Odyssey 2026" to pin down which one they mean. /search/multi
+# has no year parameter, so the digits are matched as title text and the search
+# returns nothing at all — the failure lands exactly when the user is already
+# unsure which title is which.
+_TRAILING_YEAR = re.compile(r"\s+(19\d{2}|20\d{2})\s*$")
+
+
 def search_candidates(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]:
     """Titles matching `query`, best first, for the Add form's suggestion list.
 
     Deliberately lighter than search(): no per-title details call, so this stays
     cheap enough to run while somebody is typing.
+
+    Carries `synopsis` and `vote_average` because a title and a year do not
+    always identify a film: TMDB lists two 2026 releases called "The Odyssey",
+    and without something else on the row they render identically. Both fields
+    come free — _multi_rows already parses them out of the same response.
     """
     query = (query or "").strip()
+
+    year = None
+    match = _TRAILING_YEAR.search(query)
+    if match:
+        year = int(match.group(1))
+        query = query[: match.start()].strip()
+
     if len(query) < 2:
         return []
 
     with httpx.Client() as client:
         results = _get(client, "/search/multi", {"query": query}, timeout).get("results", [])
+
+    rows = _multi_rows(results)
+    if year is not None:
+        # Rank the matching year first rather than filtering to it. A remembered
+        # year is often a year out, and hiding the right film is worse than
+        # showing it second. sort() is stable, so popularity order survives
+        # within each group.
+        rows.sort(key=lambda r: r["year"] != year)
 
     return [
         {
@@ -198,8 +225,10 @@ def search_candidates(query: str, limit: int = 8, timeout=TIMEOUT) -> list[dict]
             "title": row["title"],
             "year": row["year"],
             "poster_thumb": poster_url(row["poster_path"], size=POSTER_SIZE_THUMB),
+            "synopsis": row["synopsis"],
+            "vote_average": row["vote_average"],
         }
-        for row in _multi_rows(results)[:limit]
+        for row in rows[:limit]
     ]
 
 

@@ -37,6 +37,11 @@ class MediaCandidate(BaseModel):
     title: str
     year: Optional[int] = None
     poster_thumb: Optional[str] = None
+    # Title and year do not always identify a film — TMDB lists two 2026
+    # releases called "The Odyssey" — so the row carries something to tell
+    # otherwise-identical suggestions apart.
+    synopsis: Optional[str] = None
+    vote_average: Optional[float] = None
 
 
 class MediaSearchResponse(BaseModel):

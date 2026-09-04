@@ -135,10 +135,23 @@ export default function TitleSearchField({ value, onChange, onPick, disabled = f
                   {candidate.title}
                 </span>
                 <span className="block text-xs text-slate-500">
-                  {[candidate.year, candidate.media_type === 'tv' ? 'TV series' : 'Film']
+                  {[
+                    candidate.year,
+                    candidate.media_type === 'tv' ? 'TV series' : 'Film',
+                    candidate.vote_average ? `★ ${candidate.vote_average}` : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
+                {/* Two films can share a title and a year — TMDB lists two 2026
+                    releases called "The Odyssey" — so one line of synopsis is
+                    what makes the rows tellable apart. Truncated to one line:
+                    the list is capped at max-h-72 and rows must not grow. */}
+                {candidate.synopsis && (
+                  <span className="block truncate text-xs text-slate-400 dark:text-slate-500">
+                    {candidate.synopsis}
+                  </span>
+                )}
               </span>
             </li>
           ))}
